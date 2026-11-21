@@ -1,0 +1,43 @@
+name: Deploy EdgeEver to Cloudflare
+
+# Direct-deploy fallback for accounts where Cloudflare Workers Builds is not
+# available. The official "Update deployed EdgeEver" workflow keeps this Fork's
+# main branch aligned with the upstream stable release; this workflow deploys
+# that main snapshot directly through the Cloudflare API with wrangler.
+#
+# Pushes made with the repository GITHUB_TOKEN (used by the updater workflow)
+# do not start other workflow runs, so a daily scheduled deploy acts as the
+# automatic sync fallback. Manual runs are always available via Run workflow.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '47 2 * * *'
+
+concurrency:
+  group: edgeever-cloudflare-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout deployed repository
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build, migrate and deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          EDGE_EVER_DEPLOYMENT_URL: https://edgeever.edgeever-z2981.workers.dev
+          CI: 'true'
+        run: bun run deploy
